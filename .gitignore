@@ -1,0 +1,12 @@
+# Next.js build output
+frontend/.next/
+
+# Nest.js build output
+backend/dist/
+
+# Node modules
+**/node_modules/
+
+# Log files
+*.log
+

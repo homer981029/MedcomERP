@@ -1,0 +1,6 @@
+FROM node:20-alpine
+WORKDIR /app
+# 可選：git/bash
+RUN apk add --no-cache git bash
+EXPOSE 3000
+# compose 會用 bind mount 掛原始碼並跑 npm run dev

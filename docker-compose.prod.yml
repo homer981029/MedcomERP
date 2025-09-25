@@ -1,0 +1,69 @@
+name: medcom_erp
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: medcom_erp_db
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP:+${BIND_IP}:}${PG_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medcom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medcom123}
+      POSTGRES_DB: ${POSTGRES_DB:-medcom_erp}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medcom} -d ${POSTGRES_DB:-medcom_erp}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [ medcom_net ]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile              # multi-stage，有 COPY+build
+    container_name: medcom_erp_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BIND_IP:+${BIND_IP}:}${NEST_PORT:-4000}:4000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-medcom}
+      DB_PASS: ${POSTGRES_PASSWORD:-medcom123}
+      DB_NAME: ${POSTGRES_DB:-medcom_erp}
+      NODE_ENV: production
+      UPLOAD_DIR: /app/uploads
+    # 不掛原始碼；只掛 uploads 讓檔案持久/熱換
+    volumes:
+      - ./backend/uploads:/app/uploads
+    command: ["npm","run","start:prod"]
+    networks: [ medcom_net ]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile              # multi-stage，有 COPY+build
+    container_name: medcom_erp_frontend
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP:+${BIND_IP}:}${NEXTJS_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+    # 正式版不掛原始碼
+    command: ["npm","run","start"]
+    networks: [ medcom_net ]
+
+volumes:
+  pgdata:
+    external: true
+    name: ${PG_VOLUME_NAME:-medcom_erp_pgdata}
+
+networks:
+  medcom_net:
+    driver: bridge
