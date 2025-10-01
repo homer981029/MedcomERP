@@ -29,19 +29,19 @@ while true; do
   read -rp "請選擇: " choice
 
   case "$choice" in
-    1) sudo "$ROOT_DIR/scripts/dev.sh" up ;;
-    2) sudo "$ROOT_DIR/scripts/dev.sh" down ;;
+    1) bash "$ROOT_DIR/scripts/dev.sh" up ;;
+    2) bash "$ROOT_DIR/scripts/dev.sh" down ;;
     3)
        read -rp "選擇服務 (frontend/backend): " svc
-       sudo "$ROOT_DIR/scripts/dev.sh" logs "$svc"
+       bash "$ROOT_DIR/scripts/dev.sh" logs "$svc"
        ;;
-    4) sudo "$ROOT_DIR/scripts/prod.sh" up ;;
-    5) sudo "$ROOT_DIR/scripts/prod.sh" down ;;
-    6) sudo "$ROOT_DIR/scripts/backup_volume.sh" ;;
-    7) sudo "$ROOT_DIR/scripts/restore_volume.sh" ;;
-    8) sudo "$ROOT_DIR/scripts/dev.sh" ps ;;
-    9) sudo "$ROOT_DIR/scripts/prod.sh" ps ;;
-    10) sudo "$ROOT_DIR/scripts/clean_project.sh" ;;
+    4) bash "$ROOT_DIR/scripts/prod.sh" up ;;
+    5) bash "$ROOT_DIR/scripts/prod.sh" down ;;
+    6) bash "$ROOT_DIR/scripts/backup_volume.sh" ;;
+    7) bash "$ROOT_DIR/scripts/restore_volume.sh" ;;
+    8) bash "$ROOT_DIR/scripts/dev.sh" ps ;;
+    9) bash "$ROOT_DIR/scripts/prod.sh" ps ;;
+    10) bash "$ROOT_DIR/scripts/clean_project.sh" ;;
     0) exit 0 ;;
     *) echo "❌ 無效的選項" ;;
   esac
