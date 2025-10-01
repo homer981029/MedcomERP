@@ -1,29 +1,127 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 進交互式 psql
+docker exec -it medcom_erp_db psql -U medcom -d medcom_erp
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# 容器內登入psql
+psql -U medcom -d medcom_erp
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+# 專案結構
+/Desktop/MedcomERP/backend/src$ tree -la
+.
+├── app.controller.spec.ts
+├── app.controller.ts
+├── app.module.ts
+├── app.service.ts
+├── common
+│   ├── decorators
+│   ├── dto
+│   ├── filters
+│   ├── guards
+│   ├── interceptors
+│   ├── pipes
+│   └── utils
+├── config
+│   ├── config.module.ts
+│   └── config.service.ts
+├── database
+│   ├── prisma
+│   │   ├── prisma.module.ts
+│   │   └── prisma.service.ts
+│   └── typeorm
+│       └── typeorm.module.ts
+├── main.ts
+└── modules
+    ├── auth
+    │   ├── auth.controller.ts
+    │   ├── auth.module.ts
+    │   ├── auth.service.ts
+    │   ├── dto
+    │   │   ├── login.dto.ts
+    │   │   └── register.dto.ts
+    │   ├── guards
+    │   └── strategies
+    ├── courses
+    └── users
+        ├── dto
+        │   ├── create-user.dto.ts
+        │   └── update-user.dto.ts
+        ├── entities
+        │   └── user.entity.ts
+        ├── users.controller.ts
+        ├──  users.module.ts
+        ├── users.repository.ts
+        └── users.service.ts
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+
+
+資料清洗端（入口前）：
+
+Guards：能不能進來（身分/權限）
+
+Interceptors (before)：先套一層外衣（例如開始計時、設定 correlationId）
+
+Pipes + Param Decorators：把請求驗證/轉型/解包成 handler 參數
+
+Filters：在任一層出錯都會接住
+
+
+
+功能端（進門後）：
+
+dto + entities：定義資料結構 
+
+Controller：接已驗證好的參數調用dto 呼叫 Service 處理 
+
+Service：商業規則/流程 
+
+Repository + ORM + 調用 entities：純資料存取 
+
+Interceptors (after)：統一成功回包、寫日誌、快取結果
+
+
+# 資料庫表
+departments：部門（可階層）
+
+titles：職稱（如一般員工、主管、人資）
+
+users：使用者／員工（屬於某部門與職稱）
+
+leave_types：假別（特休、病假、事假…）
+
+leave_requests：請假單／請假申請（含原因、時段、狀態；original_request_id 連到被取消的原單）
+
+leave_attachments：請假附件／佐證檔（證明照片、檔案路徑…）
+
+approval_steps：審核步驟／簽核節點（主管→人資兩階，紀錄決議與時間）
+
+notifications：通知（誰有待簽、通過、退回等事件）
+
+leave_balances：假期餘額／可休時數（每人各假別的可用小時）
+
+# 資料表關聯
+users.department_id → departments.id                      使用者.部門ID → 部門.ID
+ 
+users.title_code → titles.code                            使用者.職稱代碼 → 職稱.代碼
+
+leave_requests.requester_id → users.id                    請假單.申請人ID → 使用者.ID
+
+leave_requests.department_id → departments.id             請假單.部門ID → 部門.ID
+
+leave_requests.leave_code → leave_types.code              請假單.假別代碼 → 假別.代碼
+
+leave_requests.original_request_id → leave_requests.id（自我關聯：取消單指向原單）      請假單.原單ID → 請假單.ID（取消單指向原單）
+
+leave_attachments.request_id → leave_requests.id          請假附件.請假單ID → 請假單.ID
+
+approval_steps.request_id → leave_requests.id             審核步驟.請假單ID → 請假單.ID
+
+approval_steps.approver_id → users.id                     審核步驟.審核人ID → 使用者.ID
+
+notifications.user_id → users.id                          通知.對象使用者ID → 使用者.ID
+
+leave_balances.user_id → users.id，leave_balances.leave_code → leave_types.code  假期餘額.使用者ID → 使用者.ID，假期餘額.假別代碼 → 假別.代碼
+
+
 
 ## Project setup
 
@@ -56,43 +154,3 @@ $ npm run test:e2e
 # test coverage
 $ npm run test:cov
 ```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
