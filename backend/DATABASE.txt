@@ -1,0 +1,179 @@
+# 進交互式 psql
+docker exec -it medcom_erp_db psql -U medcom -d medcom_erp
+
+# 容器內登入psql
+psql -U medcom -d medcom_erp
+
+
+# 資料庫表
+------------------------------------------
+# departments（部門）
+
+id：部門 ID（UUID，主鍵）。
+
+name：部門名稱（唯一）。
+------------------------------------------
+------------------------------------------
+# titles（職稱）
+
+code：職稱代碼（主鍵；如 staff、manager、hr）。
+
+name_zh：職稱中文名稱。
+------------------------------------------
+------------------------------------------
+# users（使用者／員工）
+
+id：使用者 ID（UUID，主鍵）。
+
+email：登入信箱（citext，唯一、不分大小寫）。
+
+nickname：姓名/暱稱。
+
+gender：性別（male|female|other）。
+
+password_hash：bcrypt 雜湊後的密碼。
+
+department_id：所屬部門 → 連 departments.id。
+
+title_code：職稱代碼 → 連 titles.code。
+
+role：系統角色（employee|manager|hr|admin，跟 title 互補，給權限判斷用）。
+
+shift_id：預設班別 → 連 shifts.id（你有兩個班別可選）。
+
+created_at：建立時間。
+------------------------------------------
+------------------------------------------
+# shifts（班別）
+
+id：班別 ID（UUID，主鍵）。
+
+name：班別名稱（唯一；例「班別A(08:30-17:30)」、「班別B(09:00-18:00)」）。
+
+start_local / end_local：本地上班/下班時間（TIME，台灣時區解讀）。
+
+grace_minutes：遲到容忍分鐘。
+
+early_leave_grace：早退容忍分鐘。
+
+min_work_minutes：期望工時計分鐘（多用在報表/稽核）。
+------------------------------------------
+------------------------------------------
+# leave_types（假別）
+
+code：假別代碼（主鍵；annual特休、sick病假、personal事假…）。
+
+name_zh：假別中文名稱。
+------------------------------------------
+------------------------------------------
+# leave_balances（假期餘額）
+
+user_id：使用者 → 連 users.id。
+
+leave_code：假別代碼 → 連 leave_types.code。
+
+hours：目前可用時數（以小時為單位）。
+
+主鍵是 (user_id, leave_code)；核准請假後會扣、取消核准會回補。
+------------------------------------------
+------------------------------------------
+# leave_requests（請假單）
+
+id：請假單 ID（UUID，主鍵）。
+
+kind：單據型別（apply 請假、cancel 取消請假）。
+
+original_request_id：若是取消單就指向原請假單。
+
+requester_id：申請人 → 連 users.id。
+
+department_id：申請人部門 → 連 departments.id（當下快照）。
+
+leave_code：假別 → 連 leave_types.code（如 personal）。
+
+start_at / end_at：請假區間（TIMESTAMPTZ，建議用 UTC 存）。
+
+hours：本次申請的請假時數（小時，通常後端計算）。
+
+reason / description：原因與描述。
+
+status：狀態（pending_manager|pending_hr|approved|rejected|canceled|draft）。
+
+created_at：建立時間。
+------------------------------------------
+------------------------------------------
+# leave_attachments（請假附件）
+
+id：附件 ID（UUID，主鍵）。
+
+request_id：對應請假單 → 連 leave_requests.id。
+
+file_path：檔案儲存路徑（如 /uploads/leave/xxx.jpg）。
+
+original_name：原始檔名。
+
+content_type：MIME（image/jpeg、application/pdf…）。
+
+size_bytes：檔案大小。
+
+created_at：上傳時間。
+------------------------------------------
+------------------------------------------
+# approval_steps（審核步驟）
+
+id：步驟 ID（UUID，主鍵）。
+
+request_id：請假單 → 連 leave_requests.id。
+
+step_order：序號（1、2…）。
+
+role_required：此步需要誰簽（manager 或 hr）。
+
+approver_id：實際審核人 → 連 users.id（例：部門主管B 或 HR C）。
+
+decision：決議（pending|approved|rejected）。
+
+comment：審核意見。
+
+decided_at：審核時間。
+------------------------------------------
+------------------------------------------
+# notifications（通知）
+
+id：通知 ID（UUID，主鍵）。
+
+user_id：通知對象 → 連 users.id（誰要看到紅點/待辦）。
+
+type：通知類型（leave_pending|leave_approved|leave_rejected …）。
+
+ref_type / ref_id：指回來源（這裡通常 leave_request + 請假單 ID）。
+
+payload：補充資料（JSONB，放姓名/假別/摘要）。
+
+is_read / read_at：已讀與時間。
+
+created_at：通知建立時間。
+------------------------------------------
+
+# 資料表關聯
+users.department_id → departments.id                      使用者.部門ID → 部門.ID
+ 
+users.title_code → titles.code                            使用者.職稱代碼 → 職稱.代碼
+
+leave_requests.requester_id → users.id                    請假單.申請人ID → 使用者.ID
+
+leave_requests.department_id → departments.id             請假單.部門ID → 部門.ID
+
+leave_requests.leave_code → leave_types.code              請假單.假別代碼 → 假別.代碼
+
+leave_requests.original_request_id → leave_requests.id（自我關聯：取消單指向原單）      請假單.原單ID → 請假單.ID（取消單指向原單）
+
+leave_attachments.request_id → leave_requests.id          請假附件.請假單ID → 請假單.ID
+
+approval_steps.request_id → leave_requests.id             審核步驟.請假單ID → 請假單.ID
+
+approval_steps.approver_id → users.id                     審核步驟.審核人ID → 使用者.ID
+
+notifications.user_id → users.id                          通知.對象使用者ID → 使用者.ID
+
+leave_balances.user_id → users.id，leave_balances.leave_code → leave_types.code  假期餘額.使用者ID → 使用者.ID，假期餘額.假別代碼 → 假別.代碼
