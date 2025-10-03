@@ -14,3 +14,11 @@ import {
 
 
 }
+基本上 providers 跟 exports 會一樣 
+
+
+# services.ts  是一個類 裡面有方法 要將方法放到DI 要加入 @Injectable()
+然後要 "使用" 這個類 要建立 "類實例" (語法依照使用方式會不一)
+
+# controller 裡面的"裝飾符" 是"路由" 的意思 要用 @Controller('路由名稱') 
+
